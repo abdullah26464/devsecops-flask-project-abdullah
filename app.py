@@ -34,3 +34,5 @@ def page_not_found(error):
         f"{error}. Requested URL was {request.path}"
     )
     return render_template("404.html", detailed_message=detailed_message)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
