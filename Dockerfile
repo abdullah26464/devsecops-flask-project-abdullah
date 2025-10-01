@@ -1,20 +1,35 @@
+# Use pinned official Python image (slim for smaller size)
 FROM python:3.9-slim-bullseye
 
-RUN apt-get clean \
-    && apt-get -y update
+# Install required packages in one RUN to reduce layers and cleanup apt cache
+RUN apt-get update && apt-get install -y \
+    nginx \
+    python3-dev \
+    build-essential \
+    uwsgi \
+    uwsgi-plugin-python3 \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get -y install nginx \
-    && apt-get -y install python3-dev \
-    && apt-get -y install build-essential \
-    && apt-get -y install uwsgi \
-    && apt-get -y install uwsgi-plugin-python3
+# Copy nginx config
+COPY conf/nginx.conf /etc/nginx/nginx.conf
 
-COPY conf/nginx.conf /etc/nginx
+# Copy app and set ownership to www-data for security (not root)
 COPY --chown=www-data:www-data . /srv/flask_app
+
 WORKDIR /srv/flask_app
 
-RUN pip install -r requirements.txt --src /usr/local/src
+# Install Python dependencies (consider using a virtual environment for production)
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD service nginx start; uwsgi --ini uwsgi.ini
+# Expose the port
+EXPOSE 5000
 
-USER root
+# Use non-root user www-data
+USER www-data
+
+# Add health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=5s \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Start nginx and uwsgi server
+CMD service nginx start && uwsgi --ini uwsgi.ini
